@@ -285,7 +285,6 @@ type matchList struct {
 }
 
 func (m *matchList) add(s int,e int, key string, obj string) error {
-	//fmt.Printf("start:%d, end:%d\n", s, e)
 	if s >= e {
 		return fmt.Errorf("start must less than end")
 	}
@@ -300,7 +299,6 @@ func (m *matchList) add(s int,e int, key string, obj string) error {
 		return nil
 	}
 
-	//fmt.Printf("=======last end:%d, start:%d=======\n", m.last.end, s)
 	if m.last.end <= s {
 		node := new(matchNode)
 		node.start = s
@@ -310,7 +308,6 @@ func (m *matchList) add(s int,e int, key string, obj string) error {
 		m.last.next = node
 		node.prior = m.last
 		m.last = node
-		//fmt.Println(node)
 	} else if m.last.end - m.last.end < e - s {
 		m.last.key = key
 		m.last.object = obj
@@ -330,7 +327,6 @@ type matchNode struct {
 }
 
 func (m *Matcher) Replace(in []byte) []byte {
-	//fmt.Println(string(in))
 	match := &matchList{}
 	var hits []map[string]int
 
@@ -349,21 +345,16 @@ func (m *Matcher) Replace(in []byte) []byte {
 
 			if f.output {
 				match.add(pos+1-len(f.b), pos+1, string(f.b), f.object)
-				//fmt.Println(f.object)
-				//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
 				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 
 			for !f.suffix.root {
 				f = f.suffix
-				//match.add(pos+1-len(f.b), pos+1)
 				match.add(pos+1-len(f.b), pos+1, string(f.b), f.object)
-				//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
 				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 		}
 	}
-	//node := match.root
 	var b bytes.Buffer
 	index := 0
 	for node := match.root; node != nil; {
@@ -375,9 +366,6 @@ func (m *Matcher) Replace(in []byte) []byte {
 			b.WriteString(node.object)
 			index = node.end
 		}
-		//b.Write()
-		//fmt.Printf("start:%d, end:%d\n", node.start, node.end)
-		//fmt.Printf("key:%s, obj:%s\n", node.key, node.object)
 		node = node.next
 	}
 	if index != len(in) {
@@ -388,7 +376,6 @@ func (m *Matcher) Replace(in []byte) []byte {
 }
 
 func (m *Matcher) Match(in []byte) []map[string]int {
-	fmt.Println(string(in))
 	var hits []map[string]int
 
 	n := m.root
