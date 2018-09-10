@@ -12,6 +12,7 @@ package ahocorasick
 import (
 	"container/list"
 	"fmt"
+	"bytes"
 )
 
 // A node in the trie structure used to implement Aho-Corasick
@@ -29,6 +30,7 @@ type node struct {
 
 	// The use of fixed size arrays is space-inefficient but fast for
 	// lookups.
+	object string
 
 	child [256]*node // A non-nil entry in this array means that the
 	// index represents a byte value which can be
@@ -45,6 +47,11 @@ type node struct {
 	fail *node // Pointer to the next node which is in the dictionary
 	// which can be reached from here following suffixes. Called fail
 	// because it is used to fallback in the trie when a match fails.
+}
+
+type value struct {
+	blice []byte
+	object string
 }
 
 // Matcher is returned by NewMatcher and contains a list of blices to
@@ -88,7 +95,7 @@ func (m *Matcher) getFreeNode() *node {
 // buildTrie builds the fundamental trie structure from a set of
 // blices.
 //func (m *Matcher) buildTrie(dictionary [][]byte) {
-func (m *Matcher) buildTrie(dictionary [][]byte) {
+func (m *Matcher) buildTrie(dictionary []*value) {
 
 	// Work out the maximum size for the trie (all dictionary entries
 	// are distinct plus the root). This is used to preallocate memory
@@ -96,7 +103,7 @@ func (m *Matcher) buildTrie(dictionary [][]byte) {
 
 	max := 1
 	for _, blice := range dictionary {
-		max += len(blice)
+		max += len(blice.blice)
 	}
 	m.trie = make([]node, max)
 
@@ -111,7 +118,7 @@ func (m *Matcher) buildTrie(dictionary [][]byte) {
 	for i, blice := range dictionary {
 		n := m.root
 		var path []byte
-		for _, b := range blice {
+		for _, b := range blice.blice {
 			path = append(path, b)
 
 			c := n.child[int(b)]
@@ -138,6 +145,7 @@ func (m *Matcher) buildTrie(dictionary [][]byte) {
 
 		// The last value of n points to the node representing a
 		// dictionary entry
+		n.object = blice.object
 		n.output = true
 		n.index = i
 	}
@@ -191,29 +199,41 @@ func (m *Matcher) buildTrie(dictionary [][]byte) {
 
 // NewMatcher creates a new Matcher used to match against a set of
 // blices
-func NewMatcher(dictionary [][]byte) *Matcher {
+func NewMatcher(dictionary map[string]string) *Matcher {
 //func NewMatcher(dictionary []map[string]interface{}) *Matcher {
 	m := new(Matcher)
 
-	m.buildTrie(dictionary)
+	//dict := make([]*value, 0, len(dictionary))
+	var dict []*value
 
-	return m
-}
-
-// NewStringMatcher creates a new Matcher used to match against a set
-// of strings (this is a helper to make initialization easy)
-func NewStringMatcher(dictionary []string) *Matcher {
-	m := new(Matcher)
-
-	var d [][]byte
-	for _, s := range dictionary {
-		d = append(d, []byte(s))
+	for k, v := range dictionary {
+		dict = append(dict, &value{blice:[]byte(k), object:v})
 	}
 
-	m.buildTrie(d)
+	m.buildTrie(dict)
 
 	return m
 }
+
+//NewStringMatcher creates a new Matcher used to match against a set
+//of strings (this is a helper to make initialization easy)
+//func NewStringMatcher(dictionary []string) *Matcher {
+//	m := new(Matcher)
+//
+//	var d []*value
+//	for _, s := range dictionary {
+//		seg := strings.SplitN(s, "|", 2)
+//		if len(seg) < 2 {
+//			continue
+//		}
+//		fmt.Println(seg)
+//		d = append(d, &value{blice:[]byte(seg[0]), object:seg[1]})
+//	}
+//
+//	m.buildTrie(d)
+//
+//	return m
+//}
 
 // Match searches in for blices and returns all the blices found as
 // indexes into the original dictionary
@@ -259,6 +279,114 @@ func NewStringMatcher(dictionary []string) *Matcher {
 //	return hits
 //}
 
+type matchList struct {
+	root *matchNode
+	last *matchNode
+}
+
+func (m *matchList) add(s int,e int, key string, obj string) error {
+	//fmt.Printf("start:%d, end:%d\n", s, e)
+	if s >= e {
+		return fmt.Errorf("start must less than end")
+	}
+	if  m.root == nil || m.last == nil {
+		node := new(matchNode)
+		node.start = s
+		node.end = e
+		node.key = key
+		node.object = obj
+		m.root = node
+		m.last = node
+		return nil
+	}
+
+	//fmt.Printf("=======last end:%d, start:%d=======\n", m.last.end, s)
+	if m.last.end <= s {
+		node := new(matchNode)
+		node.start = s
+		node.end = e
+		node.key = key
+		node.object = obj
+		m.last.next = node
+		node.prior = m.last
+		m.last = node
+		//fmt.Println(node)
+	} else if m.last.end - m.last.end < e - s {
+		m.last.key = key
+		m.last.object = obj
+		m.last.start = s
+		m.last.end = e
+	}
+	return nil
+}
+
+type matchNode struct {
+	key string
+	object string
+	start int
+	end int
+	prior *matchNode
+	next *matchNode
+}
+
+func (m *Matcher) Replace(in []byte) []byte {
+	//fmt.Println(string(in))
+	match := &matchList{}
+	var hits []map[string]int
+
+	n := m.root
+
+	for pos, b := range in {
+		c := int(b)
+
+		if !n.root && n.child[c] == nil {
+			n = n.fails[c]
+		}
+
+		if n.child[c] != nil {
+			f := n.child[c]
+			n = f
+
+			if f.output {
+				match.add(pos+1-len(f.b), pos+1, string(f.b), f.object)
+				//fmt.Println(f.object)
+				//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
+				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
+			}
+
+			for !f.suffix.root {
+				f = f.suffix
+				//match.add(pos+1-len(f.b), pos+1)
+				match.add(pos+1-len(f.b), pos+1, string(f.b), f.object)
+				//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
+				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
+			}
+		}
+	}
+	//node := match.root
+	var b bytes.Buffer
+	index := 0
+	for node := match.root; node != nil; {
+		if index == node.start {
+			b.WriteString(node.object)
+			index = node.end
+		} else if index < node.start {
+			b.Write(in[index:node.start])
+			b.WriteString(node.object)
+			index = node.end
+		}
+		//b.Write()
+		//fmt.Printf("start:%d, end:%d\n", node.start, node.end)
+		//fmt.Printf("key:%s, obj:%s\n", node.key, node.object)
+		node = node.next
+	}
+	if index != len(in) {
+		b.Write(in[index:])
+	}
+
+	return b.Bytes()
+}
+
 func (m *Matcher) Match(in []byte) []map[string]int {
 	fmt.Println(string(in))
 	var hits []map[string]int
@@ -283,7 +411,7 @@ func (m *Matcher) Match(in []byte) []map[string]int {
 
 			for !f.suffix.root {
 				f = f.suffix
-					//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
+				//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
 				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 		}
