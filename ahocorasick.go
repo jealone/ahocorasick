@@ -11,6 +11,7 @@ package ahocorasick
 
 import (
 	"container/list"
+	"fmt"
 )
 
 // A node in the trie structure used to implement Aho-Corasick
@@ -23,7 +24,7 @@ type node struct {
 	// be output when matching
 	index int // index into original dictionary if output is true
 
-	counter int // Set to the value of the Matcher.counter when a
+	//counter int // Set to the value of the Matcher.counter when a
 	// match is output to prevent duplicate output
 
 	// The use of fixed size arrays is space-inefficient but fast for
@@ -49,7 +50,7 @@ type node struct {
 // Matcher is returned by NewMatcher and contains a list of blices to
 // match against
 type Matcher struct {
-	counter int // Counts the number of matches done, and is used to
+	//counter int // Counts the number of matches done, and is used to
 	// prevent output of multiple matches of the same string
 	trie []node // preallocated block of memory containing all the
 	// nodes
@@ -86,6 +87,7 @@ func (m *Matcher) getFreeNode() *node {
 
 // buildTrie builds the fundamental trie structure from a set of
 // blices.
+//func (m *Matcher) buildTrie(dictionary [][]byte) {
 func (m *Matcher) buildTrie(dictionary [][]byte) {
 
 	// Work out the maximum size for the trie (all dictionary entries
@@ -136,7 +138,6 @@ func (m *Matcher) buildTrie(dictionary [][]byte) {
 
 		// The last value of n points to the node representing a
 		// dictionary entry
-
 		n.output = true
 		n.index = i
 	}
@@ -191,6 +192,7 @@ func (m *Matcher) buildTrie(dictionary [][]byte) {
 // NewMatcher creates a new Matcher used to match against a set of
 // blices
 func NewMatcher(dictionary [][]byte) *Matcher {
+//func NewMatcher(dictionary []map[string]interface{}) *Matcher {
 	m := new(Matcher)
 
 	m.buildTrie(dictionary)
@@ -215,13 +217,55 @@ func NewStringMatcher(dictionary []string) *Matcher {
 
 // Match searches in for blices and returns all the blices found as
 // indexes into the original dictionary
-func (m *Matcher) Match(in []byte) []int {
-	m.counter += 1
-	var hits []int
+//func (m *Matcher) Match(in []byte) []int {
+//	m.counter += 1
+//	var hits []int
+//
+//	n := m.root
+//
+//	for _, b := range in {
+//		c := int(b)
+//
+//		if !n.root && n.child[c] == nil {
+//			n = n.fails[c]
+//		}
+//
+//		if n.child[c] != nil {
+//			f := n.child[c]
+//			n = f
+//
+//			if f.output && f.counter != m.counter {
+//				hits = append(hits, f.index)
+//				f.counter = m.counter
+//			}
+//
+//			for !f.suffix.root {
+//				f = f.suffix
+//				if f.counter != m.counter {
+//					hits = append(hits, f.index)
+//					f.counter = m.counter
+//				} else {
+//
+//					// There's no point working our way up the
+//					// suffixes if it's been done before for this call
+//					// to Match. The matches are already in hits.
+//
+//					break
+//				}
+//			}
+//		}
+//	}
+//
+//	return hits
+//}
+
+func (m *Matcher) Match(in []byte) []map[string]int {
+	fmt.Println(string(in))
+	var hits []map[string]int
 
 	n := m.root
 
-	for _, b := range in {
+	for pos, b := range in {
 		c := int(b)
 
 		if !n.root && n.child[c] == nil {
@@ -232,24 +276,15 @@ func (m *Matcher) Match(in []byte) []int {
 			f := n.child[c]
 			n = f
 
-			if f.output && f.counter != m.counter {
-				hits = append(hits, f.index)
-				f.counter = m.counter
+			if f.output {
+				//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
+				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 
 			for !f.suffix.root {
 				f = f.suffix
-				if f.counter != m.counter {
-					hits = append(hits, f.index)
-					f.counter = m.counter
-				} else {
-
-					// There's no point working our way up the
-					// suffixes if it's been done before for this call
-					// to Match. The matches are already in hits.
-
-					break
-				}
+					//hits = append(hits, map[string]int{"pos":pos, "index":f.index, "len":len(f.b)})
+				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 		}
 	}
