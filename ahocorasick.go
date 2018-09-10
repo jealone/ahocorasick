@@ -328,7 +328,6 @@ type matchNode struct {
 
 func (m *Matcher) Replace(in []byte) []byte {
 	match := &matchList{}
-	var hits []map[string]int
 
 	n := m.root
 
@@ -345,13 +344,11 @@ func (m *Matcher) Replace(in []byte) []byte {
 
 			if f.output {
 				match.add(pos+1-len(f.b), pos+1, string(f.b), f.object)
-				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 
 			for !f.suffix.root {
 				f = f.suffix
 				match.add(pos+1-len(f.b), pos+1, string(f.b), f.object)
-				hits = append(hits, map[string]int{"start":pos+1-len(f.b), "index":f.index, "end":pos+1})
 			}
 		}
 	}
